@@ -7,15 +7,17 @@ from telegram.ext import ApplicationBuilder, ChatMemberHandler, ContextTypes
 BOT_TOKEN = '7441538182:AAHSxxZtWGhY6oFtbqqpDC5ZLgTksDpcMUA'
 ADMIN_ID = 656840694
 
-# قائمة الأعضاء المكتومين
 muted_members = set()
 
 async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
+        if not update.chat_member:
+            return
+        
         member = update.chat_member.new_chat_member
         if member.status == ChatMemberStatus.MEMBER:
             user = member.user
-            if not user.username:
+            if user and not user.username:
                 await context.bot.restrict_chat_member(
                     chat_id=update.chat_member.chat.id,
                     user_id=user.id,
@@ -23,21 +25,20 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 muted_members.add((update.chat_member.chat.id, user.id))
                 
-                # تنبيه خاص لك إذا كتم عضو
                 await context.bot.send_message(
                     chat_id=ADMIN_ID,
                     text=f"👮‍♂️ تم كتم العضو [{user.full_name}](tg://user?id={user.id}) لأنه بدون معرف.",
                     parse_mode="Markdown"
                 )
     except Exception as e:
-        print(f"خطأ أثناء معالجة عضو جديد: {e}")
+        print(f"خطأ أثناء كتم عضو: {e}")
 
 async def unmute_checked_members(app):
     while True:
         try:
             for chat_id, user_id in list(muted_members):
                 user = await app.bot.get_chat_member(chat_id, user_id)
-                if user.user.username:
+                if user and user.user.username:
                     await app.bot.restrict_chat_member(
                         chat_id=chat_id,
                         user_id=user_id,
@@ -54,7 +55,6 @@ async def unmute_checked_members(app):
                     )
                     muted_members.remove((chat_id, user_id))
                     
-                    # تنبيه بفك الكتم
                     await app.bot.send_message(
                         chat_id=ADMIN_ID,
                         text=f"🔓 تم فك الكتم عن [{user.user.full_name}](tg://user?id={user.user.id}) بعد إضافة معرف.",
@@ -62,8 +62,8 @@ async def unmute_checked_members(app):
                     )
         except Exception as e:
             print(f"خطأ أثناء فك الكتم: {e}")
-        
-        await asyncio.sleep(43200)  # كل 12 ساعة (12 × 60 × 60)
+
+        await asyncio.sleep(43200)  # كل 12 ساعة
 
 async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
